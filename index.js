@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
+const ObjectToCsv = require("objects-to-csv");
 
 const dto = {
     company: "Chaudhary Books Centre",
@@ -16,8 +17,14 @@ async function main() {
 
     await crawlPages(page);
 
-    // await browser.close();
+    await browser.close();
 
+}
+
+async function writeToCsv(data){
+    let csv = new ObjectToCsv(data);
+
+    await csv.toDisk('./sample.csv');
 }
 
 async function crawlPages(page) {
@@ -31,11 +38,11 @@ async function crawlPages(page) {
     });
 
     links = await scrapeFullPage(page);
-    console.log(links);
     const info = await scrapeInfo(links, page);
-    infos.push(info);
-
-    console.log(infos);
+    // infos.push(info);
+    // console.log(infos);
+    await writeToCsv(info);
+    
     // }
 }
 
@@ -64,32 +71,84 @@ async function scrapeFullPage(page) {
     const $ = await cheerio.load(html);
     $(".cntanr").each((index, element) => {
         const link = ($(element).attr('data-href'));
-        links.push(link);
-
+        const classNames = [];
+        $(element).find('.mobilesv').each((index, el) => {
+            const className = $(el).attr('class').split(/\s+/)[1];
+            classNames.push(className);
+        });
+        const tel = getTelNumber(classNames);
+        links.push({link,tel});
     });
+
     return links;
 }
 
-async function scrapeInfo(links , page) {
+function getTelNumber(classNames) {
+    const num = [];
+    for (let name of classNames) {
+        switch (name) {
+            case 'icon-dc':
+                num.push("+");
+                break;
+            case 'icon-fe':
+                num.push("(");
+                break;
+            case 'icon-hg':
+                num.push(")");
+                break;
+            case 'icon-ba':
+                num.push("-");
+                break;
+            case 'icon-acb':
+                num.push("0");
+                break;
+            case 'icon-yz':
+                num.push("1");
+                break;
+            case 'icon-wx':
+                num.push("2");
+                break;
+            case 'icon-vu':
+                num.push("3");
+                break;
+            case 'icon-ts':
+                num.push("4");
+                break;
+            case 'icon-rq':
+                num.push("5");
+                break;
+            case 'icon-po':
+                num.push("6");
+                break;
+            case 'icon-nm':
+                num.push("7");
+                break;
+            case 'icon-lk':
+                num.push("8");
+                break;
+            case 'icon-ji':
+                num.push("9");
+                break;
+        }
+    }
+    return num.join('');
+}
+
+async function scrapeInfo(links, page) {
     const infos = [];
-    for(i = 0; i < links.length ; i++){
-        await page.goto(links[i],{
+    for (i = 0; i < links.length; i++) {
+        await page.goto(links[i].link, {
             waitUntil: 'networkidle0'
         });
         const html = await page.evaluate(() => document.body.innerHTML);
         const $ = await cheerio.load(html);
         const business = $('span.fn').text();
-        console.log(business);
-        let address;
-        try{
-        address = $('span.lng_add').text();
-        }catch(error){
-            address = $('span.lng_add').text();
-        }
-        const telphone_1 = '';
-        const telphone_2 = '';
+        const address = $('#fulladdress > span > span').text();
+        const telephone = links[i].tel;
+        const link = links[i].link;
 
-        infos.push({business,address,telphone_1, telphone_2});
+        infos.push({ business, address, telephone, link });
+        console.log(infos[i]);
     }
     return infos;
 }
